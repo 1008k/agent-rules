@@ -46,10 +46,10 @@ if (!(Test-Path $sharedPath)) { throw "Shared source file not found: $sharedPath
 
 if ($ApplyVendorDiff) {
   Copy-Item -Force $fullVendorPath $sharedPath
-  Write-Host "Applied vendor file to shared source:"
+  Write-Output "Applied vendor file to shared source:"
 } else {
-  Write-Host "Edit this shared source file:"
+  Write-Output "Edit this shared source file:"
 }
 
-Write-Host $sharedPath
-Write-Host "After committing shared changes, run scripts/sync-agent-rules.ps1 -Ref <commit> in the project."
+Write-Output $sharedPath
+Write-Output "After committing shared changes, run scripts/sync-agent-rules.ps1 -Ref <commit> in the project."

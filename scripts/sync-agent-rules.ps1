@@ -21,6 +21,35 @@ function Read-LockValue([string]$Path, [string]$Key) {
   return $match.Matches[0].Groups[1].Value.Trim('"').Trim("'")
 }
 
+function Read-LockList([string]$Path, [string]$Key) {
+  if (!(Test-Path $Path)) { return @() }
+  $lines = Get-Content -Encoding UTF8 $Path
+  $items = @()
+  for ($index = 0; $index -lt $lines.Count; $index++) {
+    $line = $lines[$index]
+    if ($line -match "^\s*$([regex]::Escape($Key)):\s*\[\s*\]\s*$") { return @() }
+    if ($line -match "^\s*$([regex]::Escape($Key)):\s*$") {
+      for ($nested = $index + 1; $nested -lt $lines.Count; $nested++) {
+        $nestedLine = $lines[$nested]
+        if ($nestedLine -match '^\s*-\s*(.+?)\s*$') {
+          $items += (Normalize-PathText $matches[1].Trim('"').Trim("'"))
+          continue
+        }
+        if ($nestedLine -match '^\S') { break }
+      }
+      return $items
+    }
+  }
+  return @()
+}
+
+function Format-LockList([string]$Key, [string[]]$Items) {
+  if (!$Items -or $Items.Count -eq 0) { return "${Key}: []" }
+  $lines = @("${Key}:")
+  foreach ($item in $Items) { $lines += "  - $item" }
+  return $lines -join "`r`n"
+}
+
 function Read-SyncTargets([string]$ManifestPath) {
   $targets = @()
   $current = $null
@@ -56,6 +85,18 @@ function Normalize-FileTextForCompare([string]$Text) {
   return $Text.Replace("`r`n", "`n")
 }
 
+function Test-DisabledPath([string]$Path, [string[]]$DisabledPaths) {
+  $normalized = Normalize-PathText $Path
+  foreach ($disabled in $DisabledPaths) {
+    $disabledPath = Normalize-PathText $disabled
+    if (!$disabledPath) { continue }
+    if ($normalized -eq $disabledPath -or $normalized.StartsWith($disabledPath.TrimEnd("/") + "/")) {
+      return $true
+    }
+  }
+  return $false
+}
+
 function Assert-NoUnsafeLocalChange([string]$Repo, [string]$OldRef, [string]$SourcePath, [string]$DestPath, [string]$NewText) {
   $currentText = Get-FileTextOrNull $DestPath
   if ($null -eq $currentText) { return }
@@ -84,6 +125,13 @@ $manifestPath = Join-Path $SharedRepo "manifest.yaml"
 if (!(Test-Path $manifestPath)) { throw "Missing manifest: $manifestPath" }
 
 $oldRef = Read-LockValue $LockPath "ref"
+$disabled = @(Read-LockList $LockPath "disabled")
+if (!$Ref) {
+  $dirty = & git -C $SharedRepo status --porcelain
+  if ($dirty) {
+    throw "Shared repo has uncommitted changes. Commit them or pass -Ref <commit> before syncing."
+  }
+}
 $resolvedRef = if ($Ref) { (& git -C $SharedRepo rev-parse $Ref).Trim() } else { (& git -C $SharedRepo rev-parse HEAD).Trim() }
 if ($LASTEXITCODE -ne 0 -or !$resolvedRef) { throw "Could not resolve shared ref: $Ref" }
 
@@ -104,11 +152,15 @@ try {
     foreach ($sourceFile in Get-ChildItem -Recurse -File $sourceDir) {
       $relativeFromTarget = [IO.Path]::GetRelativePath($sourceDir, $sourceFile.FullName)
       $sourceRel = (Normalize-PathText (Join-Path $target.Source $relativeFromTarget))
+      if (Test-DisabledPath $sourceRel $disabled) {
+        Write-Output "Skipping disabled shared file: $sourceRel"
+        continue
+      }
       $destPath = Join-Path $destDir $relativeFromTarget
       $newText = Get-Content -Raw -Encoding UTF8 $sourceFile.FullName
       Assert-NoUnsafeLocalChange $SharedRepo $oldRef $sourceRel $destPath $newText
       if ($DryRun) {
-        Write-Host "Would sync $sourceRel -> $destPath"
+        Write-Output "Would sync $sourceRel -> $destPath"
       } else {
         New-Item -ItemType Directory -Force (Split-Path $destPath -Parent) | Out-Null
         Copy-Item -Force $sourceFile.FullName $destPath
@@ -119,6 +171,7 @@ try {
   if (!$DryRun) {
     New-Item -ItemType Directory -Force (Split-Path $LockPath -Parent) | Out-Null
     $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $disabledBlock = Format-LockList "disabled" $disabled
     @"
 version: 1
 source:
@@ -128,12 +181,12 @@ source:
 managed:
   - docs/integrations/
   - .agents/skills/
-disabled: []
+$disabledBlock
 last_synced_at: $timestamp
 "@ | Set-Content -Encoding UTF8 -NoNewline $LockPath
   }
 
-  Write-Host "agent-rules sync complete: $resolvedRef"
+  Write-Output "agent-rules sync complete: $resolvedRef"
 } finally {
   if ($tempWorktree -and (Test-Path $tempWorktree)) {
     & git -C $SharedRepo worktree remove --force $tempWorktree | Out-Null
