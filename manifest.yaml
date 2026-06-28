@@ -14,9 +14,15 @@ sync_targets:
     type: codex-skills
     overwrite: true
     description: Shared Codex-compatible skills and their references.
+  - source: docs/shared-rules/
+    destination: .agents/shared-rules/
+    type: shared-rules
+    overwrite: true
+    description: Shared baseline coding, UX, and writing rules.
 
 local_extension_policy:
   keep_unmanaged_files: true
   shared_name_conflicts: stop
   project_specific_docs: docs/integrations/
   project_specific_skills: .agents/skills/
+  project_specific_rule_overrides: docs/rules-*.md
