@@ -127,7 +127,7 @@ if (!(Test-Path $manifestPath)) { throw "Missing manifest: $manifestPath" }
 $oldRef = Read-LockValue $LockPath "ref"
 $disabled = @(Read-LockList $LockPath "disabled")
 if (!$Ref) {
-  $dirty = & git -C $SharedRepo status --porcelain
+  $dirty = & git -C $SharedRepo status --porcelain --untracked-files=all
   if ($dirty) {
     throw "Shared repo has uncommitted changes. Commit them or pass -Ref <commit> before syncing."
   }
