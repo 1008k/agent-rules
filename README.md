@@ -19,6 +19,8 @@ scripts/adopt-shared-reference.ps1 -ProjectRoot V:\dev\your-project -Ref main
 
 The script installs lightweight project wrappers, writes `.shared/shared-reference.lock.yaml`, and syncs the managed files into the project.
 
+For an agent-ready installation prompt, see `docs/install-in-project.md`.
+
 For a new project copied from `_project-starter`, the wrappers and lock file may already exist. In that case, update the vendored copy from the project:
 
 ```powershell
