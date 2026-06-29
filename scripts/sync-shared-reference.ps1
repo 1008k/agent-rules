@@ -115,6 +115,38 @@ function Get-ManagedDestinationForLock($Target, [string]$SourceRoot) {
   return $destination
 }
 
+function Get-ManagedSourcePathOrNull([string]$Path) {
+  $text = Get-FileTextOrNull $Path
+  if ($null -eq $text) { return $null }
+  if ($text -notmatch 'managed-by:\s*(shared-reference|agent-rules)') { return $null }
+  $match = [regex]::Match($text, 'source-path:\s*(.+?)(?:\s*-->|\s*$)', [System.Text.RegularExpressions.RegexOptions]::Multiline)
+  if (!$match.Success) { return $null }
+  return Normalize-PathText $match.Groups[1].Value.Trim()
+}
+
+function Remove-StaleManagedFiles([string]$ProjectRoot, [string[]]$ManagedPaths, [hashtable]$ExpectedSources, [string[]]$DisabledPaths) {
+  foreach ($managedPath in ($ManagedPaths | Where-Object { $_ } | Select-Object -Unique)) {
+    $fullPath = Join-Path $ProjectRoot $managedPath
+    if (!(Test-Path $fullPath)) { continue }
+    $files = if (Test-Path $fullPath -PathType Leaf) {
+      @(Get-Item $fullPath)
+    } else {
+      @(Get-ChildItem -Recurse -File $fullPath)
+    }
+    foreach ($file in $files) {
+      $sourcePath = Get-ManagedSourcePathOrNull $file.FullName
+      if (!$sourcePath) { continue }
+      if (Test-DisabledPath $sourcePath $DisabledPaths) { continue }
+      if ($ExpectedSources.ContainsKey($sourcePath)) { continue }
+      if ($DryRun) {
+        Write-Output "Would remove stale managed file: $($file.FullName)"
+      } else {
+        Remove-Item -LiteralPath $file.FullName -Force
+      }
+    }
+  }
+}
+
 function Assert-NoUnsafeLocalChange([string]$Repo, [string]$OldRef, [string]$SourcePath, [string]$DestPath, [string]$NewText) {
   $currentText = Get-FileTextOrNull $DestPath
   if ($null -eq $currentText) { return }
@@ -166,6 +198,7 @@ if ($Ref) {
 }
 
 try {
+  $expectedSources = @{}
   foreach ($target in $targets) {
     $sourcePath = Join-Path $sourceRoot $target.Source
     $destPath = Join-Path $ProjectRoot $target.Destination
@@ -176,6 +209,7 @@ try {
         Write-Output "Skipping disabled shared file: $sourceRel"
         continue
       }
+      $expectedSources[$sourceRel] = $true
       $newText = Get-Content -Raw -Encoding UTF8 $sourcePath
       Assert-NoUnsafeLocalChange $SharedRepo $oldRef $sourceRel $destPath $newText
       if ($DryRun) {
@@ -194,6 +228,7 @@ try {
           Write-Output "Skipping disabled shared file: $sourceRel"
           continue
         }
+        $expectedSources[$sourceRel] = $true
         $fileDestPath = Join-Path $destDir $relativeFromTarget
         $newText = Get-Content -Raw -Encoding UTF8 $sourceFile.FullName
         Assert-NoUnsafeLocalChange $SharedRepo $oldRef $sourceRel $fileDestPath $newText
@@ -206,6 +241,10 @@ try {
       }
     }
   }
+
+  $oldManagedPaths = @(Read-LockList $ReadLockPath "managed")
+  $newManagedPaths = @($targets | ForEach-Object { Get-ManagedDestinationForLock $_ $sourceRoot })
+  Remove-StaleManagedFiles $ProjectRoot @($oldManagedPaths + $newManagedPaths) $expectedSources $disabled
 
   if (!$DryRun) {
     New-Item -ItemType Directory -Force (Split-Path $LockPath -Parent) | Out-Null

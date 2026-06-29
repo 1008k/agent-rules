@@ -5,8 +5,11 @@ source_repo: https://github.com/1008k/shared-reference.git
 
 sources:
   shared_docs_directory: .shared/docs/
-  shared_rules_directory: .shared/docs/shared-rules/
-  shared_integrations_directory: .shared/docs/integrations/
+  shared_rules:
+    coding: .shared/docs/rules-coding.md
+    ux: .shared/docs/rules-ux.md
+    writing: .shared/docs/rules-writing.md
+  shared_skills_index: .shared/skills/skills-index.md
   shared_skills_directory: .shared/skills/
 
 policy:
@@ -21,5 +24,4 @@ policy:
     project_specific_or_discovery_shims: .agents/skills/
   local_overrides:
     rules: docs/rules-*.md
-    integrations: docs/integrations/
     skills: .agents/skills/

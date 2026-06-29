@@ -1,6 +1,6 @@
 <!-- managed-by: shared-reference -->
 <!-- source-repo: https://github.com/1008k/shared-reference -->
-<!-- source-path: docs/shared-rules/rules-writing.md -->
+<!-- source-path: docs/rules-writing.md -->
 
 # 文書表記ルール
 

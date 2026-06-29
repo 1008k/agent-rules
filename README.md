@@ -1,6 +1,6 @@
 # Shared Reference
 
-Shared reference documents, baseline rules, integration notes, and skills.
+Shared reference documents, baseline rules, and skills.
 
 This repository is the source of truth for reusable files that are vendored into individual projects. Project-specific requirements, specs, and local overrides should stay in each project.
 
@@ -30,7 +30,7 @@ scripts/sync-shared-reference.ps1 -Ref <shared-reference-commit>
 Do not edit vendored managed files directly inside a project. To find the source file:
 
 ```powershell
-scripts/propose-shared-reference-change.ps1 -VendorPath .shared\docs\shared-rules\rules-coding.md
+scripts/propose-shared-reference-change.ps1 -VendorPath .shared\docs\rules-coding.md
 ```
 
 Edit and commit the file in this repository, push `shared-reference`, then sync each project to the new commit.
@@ -45,15 +45,16 @@ docs/
   rules-coding.md
   rules-ux.md
   rules-writing.md
-  integrations/
 
 .shared/
   shared-reference.lock.yaml
   shared-index.yaml
   docs/
-    shared-rules/
-    integrations/
+    rules-coding.md
+    rules-ux.md
+    rules-writing.md
   skills/
+    skills-index.md
 ```
 
 Project-owned documents stay in `docs/`. Vendored shared documents and skills stay under `.shared/`. The project `docs/policy-index.yaml` should link to `.shared/shared-index.yaml` when shared guidance is relevant.
@@ -61,7 +62,6 @@ Project-owned documents stay in `docs/`. Vendored shared documents and skills st
 ## Local Overrides
 
 - Put project-specific coding, UX, and writing exceptions in `docs/rules-coding.md`, `docs/rules-ux.md`, and `docs/rules-writing.md`.
-- Put project-specific integration notes in `docs/integrations/`.
 - Put project-specific skills in `.agents/skills/` using a unique skill name. Some agents only auto-discover skills from `.agents/skills/`; shared skills in `.shared/skills/` may need explicit routing from project docs or a local shim.
 - If a shared file should not sync into a project, add its source path to `disabled` in `.shared/shared-reference.lock.yaml`.
 
@@ -69,7 +69,6 @@ Example:
 
 ```yaml
 disabled:
-  - docs/integrations/
   - .agents/skills/web-a11y-review/
 ```
 

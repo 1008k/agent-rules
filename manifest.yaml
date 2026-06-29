@@ -23,6 +23,6 @@ sync_targets:
 local_extension_policy:
   keep_unmanaged_files: true
   shared_name_conflicts: stop
-  project_specific_docs: docs/integrations/
+  project_specific_docs: docs/
   project_specific_skills: .agents/skills/
   project_specific_rule_overrides: docs/rules-*.md
